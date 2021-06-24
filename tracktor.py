@@ -92,6 +92,21 @@ def detect_and_draw_contours(frame, thresh, meas_last, meas_now, min_area = 0, m
             i += 1
     return final, contours, meas_last, meas_now
 
+
+
+def get_countours_bounds(contours):
+    bounds_list = []
+    contours_list = [[list(c[0]) for c in cc] for cc in contours]
+    for i in range(len(contours_list)):
+        min_xy = tuple(np.min(np.asarray(contours_list[i]), axis=0))
+        max_xy = tuple(np.max(np.asarray(contours_list[i]), axis=0))
+        bounds_list.append([min_xy, max_xy])
+        
+    return bounds_list
+
+
+
+
 def apply_k_means(contours, n_inds, meas_now):
     """
     This function applies the k-means clustering algorithm to separate merged
