@@ -8,14 +8,18 @@ from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 
 
+df_params = pd.read_csv("params.csv")
 
 
+
+
+##Temporary Cell
 
 # colours is a vector of BGR values which are used to identify individuals in the video
 # t_id is termite id and is also used for individual identification
 # number of elements in colours should be greater than n_inds (THIS IS NECESSARY FOR VISUALISATION ONLY)
 # number of elements in t_id should be greater than n_inds (THIS IS NECESSARY TO GET INDIVIDUAL-SPECIFIC DATA)
-n_inds = 5
+n_inds = 1
 t_id = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 colours = [(0,0,255),(0,255,255),(255,0,255),(255,255,255),(255,255,0),(255,0,0),(0,255,0),(0,0,0)]
 
@@ -30,11 +34,11 @@ scaling = 1.0
 # minimum area and maximum area occupied by the animal in number of pixels
 # this parameter is used to get rid of other objects in view that might be hard to threshold out but are differently sized
 min_area = 50
-max_area = 1000
+max_area = 700
 
 # mot determines whether the tracker is being used in noisyconditions to track a single object or for multi-object
 # using this will enable k-means clustering to force n_inds number of animals
-mot = True
+mot = False
 
 # name of source video and paths
 video = 'resize2'
@@ -43,6 +47,17 @@ output_vidpath = 'C:/Users/aryan/Downloads/tracktor-master/output/' + video + '_
 output_filepath = 'C:/Users/aryan/Downloads/tracktor-master/output/' + video + '_tracked.csv'
 codec = 'DIVX' # try other codecs if the default doesn't work ('DIVX', 'avc1', 'XVID') note: this list is non-exhaustive
 
+
+
+def get_countours_bounds(contours):
+    bounds_list = []
+    contours_list = [[list(c[0]) for c in cc] for cc in contours]
+    for i in range(len(contours_list)):
+        min_xy = tuple(np.min(np.asarray(contours_list[i]), axis=0))
+        max_xy = tuple(np.max(np.asarray(contours_list[i]), axis=0))
+        bounds_list.append([min_xy, max_xy])
+        
+    return bounds_list
 
 
 ## Open video
@@ -63,6 +78,8 @@ meas_now = list(np.zeros((n_inds,2)))
 df = []
 last = 0
 
+frame_bounds_list = []
+
 while(True):
     # Capture frame-by-frame
     ret, frame = cap.read()
@@ -75,13 +92,15 @@ while(True):
         final, contours, meas_last, meas_now = tr.detect_and_draw_contours(frame, thresh, meas_last, meas_now, min_area, max_area)
         if len(meas_now) != n_inds:
             contours, meas_now = tr.apply_k_means(contours, n_inds, meas_now)
+            
+            frame_bounds_list.append(get_countours_bounds(contours))
         
         row_ind, col_ind = tr.hungarian_algorithm(meas_last, meas_now)
         final, meas_now, df = tr.reorder_and_draw(final, colours, n_inds, col_ind, meas_now, df, mot, this)
         
         # Create output dataframe
         for i in range(n_inds):
-            df.append([this, meas_now[i][0], meas_now[i][1], t_id[i]])
+            df.append([this, meas_now[i][0], meas_now[i][1]])
         
         # Display the resulting frame
         out.write(final)
@@ -95,7 +114,7 @@ while(True):
     last = this
 
 ## Write positions to file
-df = pd.DataFrame(np.matrix(df), columns = ['frame','pos_x','pos_y', 'id'])
+df = pd.DataFrame(np.matrix(df), columns = ['frame','pos_x','pos_y'])
 df.to_csv(output_filepath, sep=',')
 
 ## When everything done, release the capture
@@ -105,17 +124,7 @@ cv2.destroyAllWindows()
 cv2.waitKey(1)
 
 
-
 df = pd.read_csv(output_filepath)
-df.head()
-
-
-
-
-or num,val in enumerate(np.unique(df['id'])):
-    df.loc[df['id'] == val, 'id'] = num
-
-df.head()
 
 
 
