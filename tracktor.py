@@ -32,7 +32,7 @@ def colour_to_thresh(frame, block_size = 31, offset = 25):
     thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, block_size, offset)
     return thresh
 
-def detect_and_draw_contours(frame, thresh, meas_last, meas_now, min_area = 0, max_area = 10000):
+def detect_and_draw_contours(frame, thresh, meas_last, meas_now, HSV, min_area = 0, max_area = 10000):
     """
     This function detects contours, thresholds them based on area and draws them.
     
@@ -71,13 +71,40 @@ def detect_and_draw_contours(frame, thresh, meas_last, meas_now, min_area = 0, m
     img = cv2.cvtColor(thresh.copy(), cv2.COLOR_GRAY2BGR)
 
     final = frame.copy()
+    
+    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    
+    H = HSV.item(0)
+    S = HSV.item(1)
+    V = HSV.item (2)
 
     i = 0
     meas_last = meas_now.copy()
     del meas_now[:]
     while i < len(contours):
+        # 2021-07-08:Aryana - added new section to eliminate colors outside of the expected range
+        #print(f"{'='*30}\r\n# of contours: {len(contours[i])}\r\n{'-'*30}")
+        mask = np.zeros(hsv_frame.shape[:2], np.uint8)
+        cv2.drawContours(mask, [contours[i]], -1, 255, -1)
+        mean_mask = np.round(cv2.mean(hsv_frame, mask=mask)).astype(np.uint8)[:3]
+        print(mean_mask)
+                
         area = cv2.contourArea(contours[i])
-        if area < min_area or area > max_area:
+        
+        
+        #if 80 > mean_mask[0] or 112 < mean_mask[0]:
+            #del contours[i]
+            
+        #if 115 > mean_mask[1] or 160 < mean_mask[1]:
+            #del contours[i]
+            
+        #if 45 > mean_mask[2] or 85 < mean_mask[2]:
+            #del contours[i]
+            
+        #if area < min_area or area > max_area:
+            #del contours[i]
+            
+        if ((H - 20) > mean_mask[0] or (H + 20) < mean_mask[0]) or ((S - 20) > mean_mask[1] or (S + 20) < mean_mask[1]) or ((V - 20) > mean_mask[2] or (V + 20) < mean_mask[2]) or (area < min_area or area > max_area):
             del contours[i]
         else:
             cv2.drawContours(final, contours, i, (0,0,255), 1)
@@ -91,21 +118,6 @@ def detect_and_draw_contours(frame, thresh, meas_last, meas_now, min_area = 0, m
             meas_now.append([cx,cy])
             i += 1
     return final, contours, meas_last, meas_now
-
-
-
-def get_countours_bounds(contours):
-    bounds_list = []
-    contours_list = [[list(c[0]) for c in cc] for cc in contours]
-    for i in range(len(contours_list)):
-        min_xy = tuple(np.min(np.asarray(contours_list[i]), axis=0))
-        max_xy = tuple(np.max(np.asarray(contours_list[i]), axis=0))
-        bounds_list.append([min_xy, max_xy])
-        
-    return bounds_list
-
-
-
 
 def apply_k_means(contours, n_inds, meas_now):
     """
